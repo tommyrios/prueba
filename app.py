@@ -1,24 +1,37 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-st.set_page_config(page_title="Monitor Regulatorio BBVA", layout="wide")
+# Configuración de página
+st.set_page_config(page_title="Monitor Legislativo BBVA", layout="wide")
 
-st.title("🏛️ Dashboard de Asuntos Públicos")
+st.title("📊 Monitor de Asuntos Públicos - BBVA")
 
-# Conectar con tu Google Sheet (simplificado)
-# df = cargar_datos_desde_sheets() 
+# 1. Conexión con tu Google Sheet
+conn = st.connection("gsheets", type=GSheetsConnection)
+df = conn.read(spreadsheet="https://docs.google.com/spreadsheets/d/1P0Z8phkksBeCLzn-x5UF5iof7ooH4tKrEcbwBDBhAPc/edit?usp=sharing")
 
-# Filtros en la barra lateral
-impacto_filtro = st.sidebar.multiselect("Nivel de Impacto", ["Alto", "Medio", "Bajo"], default="Alto")
+# 2. Sidebar para filtros rápidos
+st.sidebar.header("Filtros")
+impacto_sel = st.sidebar.multiselect("Nivel de Impacto", df["Impacto"].unique(), default="ALTO")
+partido_sel = st.sidebar.multiselect("Partido Político", df["Partido Político"].unique())
 
-# Mostrar métricas clave
-col1, col2 = st.columns(2)
-col1.metric("Proyectos Mes Actual", "24", "+5%")
-col2.metric("Impacto Alto detectado", "3", "-2")
+# Filtrado de datos
+df_filtrado = df[df["Impacto"].isin(impacto_sel)]
+if partido_sel:
+    df_filtrado = df_filtrado[df_filtrado["Partido Político"].isin(partido_sel)]
 
-st.subheader("Proyectos de Ley Filtrados")
-# Mostrás la tabla que ya tenés automatizada
-st.dataframe(df[df['impacto'].isin(impacto_filtro)])
+# 3. Métricas principales
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Proyectos", len(df))
+col2.metric("Impacto Alto", len(df[df["Impacto"] == "ALTO"]))
+col3.metric("Última Actualización", df["Fecha de inicio"].max())
 
-# Un gráfico rápido de los temas más tratados
-st.bar_chart(df['tema'].value_counts())
+# 4. Visualización de la Tabla interactiva
+st.subheader("Detalle de Proyectos Seleccionados")
+st.dataframe(df_filtrado, use_container_width=True)
+
+# 5. Un toque de análisis (Gráfico por Comisión)
+st.subheader("Proyectos por Comisión")
+comisiones_count = df_filtrado["Comisiones"].value_counts()
+st.bar_chart(comisiones_count)
