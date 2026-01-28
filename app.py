@@ -103,6 +103,7 @@ with col_title:
     st.markdown("<h2 style='margin:0; padding-top:10px;'>Monitor Legislativo — Asuntos Públicos</h2>", unsafe_allow_html=True)
     st.markdown("<p style='color:#94a3b8; margin:0;'>Análisis de Impacto Legislativo y Riesgo Regulatorio</p>", unsafe_allow_html=True)
     st.markdown("<p style='color:#94a3b8; margin:0;'>Inteligencia Regulatoria • Focos de Impacto • Seguimiento Territorial</p>", unsafe_allow_html=True)
+    st.markdown(unsafe_allow_html=True)
 
 # 5. BARRA LATERAL (Sobria)
 with st.sidebar:
