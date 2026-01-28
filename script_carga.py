@@ -13,15 +13,21 @@ def ejecutar_carga():
         # Leemos los datos
         df = pd.read_csv(URL_CSV)
         
-        # --- EL ARREGLO ESTÁ ACÁ ---
-        # Reemplazamos los NaN (celdas vacías) por un string vacío
-        # Esto hace que los datos sean compatibles con JSON
-        df = df.fillna("") 
+        # 1. Limpieza de NaN
+        df = df.fillna("")
         
-        # Filtramos filas que realmente tengan un ID para no mandar basura
+        # 2. MAPEAMOS LOS NOMBRES (De Planilla -> A nombres de API)
+        # Esto corrige el error 422
+        df = df.rename(columns={
+            "Cámara de Origen": "Camara_de_Origen",
+            "Fecha de inicio": "Fecha_de_inicio",
+            "Partido Político": "Partido_Politico"
+        })
+        
+        # 3. Filtramos filas vacías
         df = df[df['ID'] != ""]
         
-        # Convertimos a la lista de diccionarios
+        # Convertimos a JSON
         proyectos = df.to_dict(orient="records")
         
         # Enviamos el POST
