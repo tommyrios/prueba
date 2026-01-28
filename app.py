@@ -7,7 +7,6 @@ import plotly.graph_objects as go
 # 1. CONFIGURACIÓN DE PÁGINA (ESTILO DARK BBVA)
 st.set_page_config(
     page_title="Monitor Legislativo | BBVA",
-    page_icon="🏛️",
     layout="wide"
 )
 
@@ -75,18 +74,17 @@ def fetch_data():
 df_raw = fetch_data()
 
 # 3. HEADER PERSONALIZADO CON LOGO
-col_logo, col_text = st.columns([1, 4])
-with col_logo:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Logo_BBVA.svg/2560px-Logo_BBVA.svg.png", width=140)
+col_text = st.columns([1, 4])
+
 with col_text:
-    st.markdown("<h1 style='margin-bottom:0'>Monitor Legislativo — Dirección de Asuntos Públicos</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='margin-bottom:0'>Monitor Legislativo — Asuntos Públicos BBVA</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color:#94a3b8'>Inteligencia Regulatoria • Focos de Impacto • Seguimiento Territorial</p>", unsafe_allow_html=True)
 
 st.markdown("---")
 
 # 4. BARRA LATERAL (Filtros Estilo "Pills")
 with st.sidebar:
-    st.markdown("### 🛠️ Parámetros de Filtro")
+    st.markdown("### Parámetros de Filtro")
     q = st.text_input("Buscador por palabra clave", "")
     
     st.markdown("---")
@@ -96,7 +94,7 @@ with st.sidebar:
     f_camara = st.multiselect("Cámara de Origen", options=camaras, default=camaras)
     
     st.markdown("---")
-    if st.button("🔄 Refrescar API"):
+    if st.button("Refrescar Datos"):
         st.cache_data.clear()
         st.rerun()
 
@@ -122,7 +120,7 @@ if not df.empty:
     col_main, col_side = st.columns([1.2, 0.8])
 
     with col_main:
-        st.markdown("#### 🏛️ Iniciativas por Partido Político")
+        st.markdown("#### Iniciativas por Partido Político")
         # Gráfico de barras horizontales (Estilo azul BBVA)
         partidos = df['Partido_Politico'].value_counts().head(10).sort_values(ascending=True).reset_index()
         fig_bar = px.bar(
@@ -140,7 +138,7 @@ if not df.empty:
         st.plotly_chart(fig_bar, use_container_width=True)
 
     with col_side:
-        st.markdown("#### 🎯 Composición de Impacto")
+        st.markdown("#### Composición de Impacto")
         # Gráfico de Gauge / Donut para ejecución (simulando el gauge del HTML)
         fig_donut = px.pie(
             df, names='Impacto', hole=0.7,
@@ -158,11 +156,10 @@ if not df.empty:
 
     # 7. TABLA DE DETALLE (Ocupa todo el ancho abajo)
     st.markdown("---")
-    st.markdown("### 🔍 Detalle de Iniciativas Legislativas")
-    st.markdown("<p style='font-size:12px; color:#94a3b8'>Ordenado por ingreso más reciente (ID Descendente). La columna ID ha sido ocultada para facilitar la lectura.</p>", unsafe_allow_html=True)
+    st.markdown("### Detalle de Iniciativas Legislativas")
     
     # Configuración de columnas visibles (Sin ID)
-    cols_to_show = ["Fecha_de_inicio", "Camara_de_Origen", "Expediente", "Autor", "Partido_Politico", "Provincia", "Proyecto", "Impacto", "Observaciones"]
+    cols_to_show = ["Camara_de_Origen", "Expediente", "Autor", "Partido_Politico", "Provincia", "Proyecto", "Impacto", "Observaciones"]
     
     st.dataframe(
         df,
@@ -170,12 +167,11 @@ if not df.empty:
         hide_index=True,
         use_container_width=True,
         column_config={
-            "Fecha_de_inicio": st.column_config.TextColumn("Fecha", width="small"),
             "Camara_de_Origen": st.column_config.TextColumn("Cámara", width="small"),
             "Proyecto": st.column_config.TextColumn("Título del Proyecto", width="large"),
             "Impacto": st.column_config.TextColumn("Impacto", width="small"),
             "Partido_Politico": st.column_config.TextColumn("Bloque", width="medium"),
-            "Observaciones": st.column_config.TextColumn("Análisis Técnico", width="medium")
+            "Observaciones": st.column_config.TextColumn("Análisis", width="medium")
         }
     )
 
