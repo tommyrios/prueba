@@ -1,3 +1,6 @@
 streamlit
 pandas
 st-gsheets-connection
+fastapi
+uvicorn
+pydantic
