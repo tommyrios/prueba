@@ -3,113 +3,121 @@ import requests
 import pandas as pd
 import plotly.express as px
 
-# 1. Configuración de la página
-st.set_page_config(page_title="Monitor Legislativo BBVA", page_icon="🏛️", layout="wide")
+st.set_page_config(page_title="Monitor BBVA", page_icon="🏛️", layout="wide")
 
-# Estética corporativa BBVA
+# CSS personalizado para arreglar las tarjetas blancas y fuentes
 st.markdown("""
     <style>
-    .main { background-color: #f4f7f9; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #d1d8e0; }
+    [data-testid="stMetricValue"] { font-size: 28px; color: #004481; }
+    [data-testid="stMetricLabel"] { font-size: 16px; color: #4b4b4b; }
+    .stDataFrame { border: 1px solid #e6e9ef; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ Monitor de Actividad Parlamentaria")
-st.subheader("Visualización vía API - Asuntos Públicos BBVA")
-
-# URL de tu API en Render
 API_URL = "https://prueba-9969.onrender.com/datos"
 
-# 2. Función de carga de datos con manejo de caché y errores
-@st.cache_data(ttl=60) # Actualiza automáticamente cada 1 minuto
+@st.cache_data(ttl=60)
 def fetch_data():
     try:
-        # Usamos un parámetro dummy para evitar respuestas cacheadas por el navegador
-        response = requests.get(f"{API_URL}?update=true", timeout=10)
+        response = requests.get(API_URL, timeout=10)
         if response.status_code == 200:
-            res_json = response.json()
-            
-            # Verificamos si la respuesta es una lista directa o un dict con clave 'datos'
-            if isinstance(res_json, dict) and "datos" in res_json:
-                data = res_json["datos"]
-            else:
-                data = res_json
-                
-            df = pd.DataFrame(data)
-            
+            df = pd.DataFrame(response.json())
             if not df.empty:
-                # Ordenar por ID descendente
+                # LIMPIEZA CRÍTICA: Filtrar solo Impactos válidos para que el gráfico no sea "raro"
+                df = df[df['Impacto'].isin(['ALTO', 'MEDIO', 'BAJO'])]
                 df = df.sort_values(by="ID", ascending=False)
             return df
         return pd.DataFrame()
-    except Exception as e:
-        st.sidebar.error(f"Error de conexión: {e}")
+    except:
         return pd.DataFrame()
 
-# --- CARGA DE DATOS ---
-df = fetch_data()
+df_raw = fetch_data()
 
-# --- BARRA LATERAL ---
+# --- BARRA LATERAL CON FILTROS ---
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Logo_BBVA.svg/2560px-Logo_BBVA.svg.png", width=150)
-    st.write("### Opciones")
-    if st.button("🔄 Sincronizar ahora"):
+    st.title("Filtros")
+    
+    # Filtro por Impacto
+    filtro_impacto = st.multiselect("Nivel de Impacto", options=['ALTO', 'MEDIO', 'BAJO'], default=['ALTO', 'MEDIO', 'BAJO'])
+    
+    # Filtro por Cámara
+    opciones_camara = df_raw['Camara_de_Origen'].unique().tolist() if not df_raw.empty else []
+    filtro_camara = st.multiselect("Cámara", options=opciones_camara, default=opciones_camara)
+
+    if st.button("🔄 Sincronizar API"):
         st.cache_data.clear()
         st.rerun()
 
+# Aplicar filtros
+if not df_raw.empty:
+    df = df_raw[(df_raw['Impacto'].isin(filtro_impacto)) & (df_raw['Camara_de_Origen'].isin(filtro_camara))]
+else:
+    df = pd.DataFrame()
+
 if not df.empty:
-    # --- BLOQUE 1: MÉTRICAS ---
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Proyectos Totales", len(df))
-    col2.metric("Impacto ALTO", len(df[df['Impacto'] == 'ALTO']))
-    col3.metric("Última Iniciativa", df['Fecha_de_inicio'].iloc[0])
+    # --- MÉTRICAS ---
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Proyectos", len(df))
+    c2.metric("Impacto ALTO", len(df[df['Impacto'] == 'ALTO']))
+    c3.metric("Partidos", df['Partido_Politico'].nunique())
+    c4.metric("Provincias", df['Provincia'].nunique())
 
-    st.divider()
+    st.markdown("---")
 
-    # --- BLOQUE 2: VISUALIZACIONES INTERACTIVAS ---
-    c_left, c_right = st.columns(2)
+    # --- GRÁFICOS ---
+    col1, col2 = st.columns([1, 1.5])
 
-    with c_left:
-        st.write("#### 📊 Distribución por Impacto")
-        fig_pie = px.pie(df, names='Impacto', hole=0.4,
-                         color='Impacto',
-                         color_discrete_map={'ALTO':'#D35400', 'MEDIO':'#F39C12', 'BAJO':'#27AE60'})
-        fig_pie.update_layout(margin=dict(t=30, b=0, l=0, r=0))
+    with col1:
+        st.markdown("##### 🎯 Prioridad de Seguimiento")
+        fig_pie = px.pie(
+            df, names='Impacto', 
+            hole=0.5,
+            color='Impacto',
+            color_discrete_map={'ALTO':'#D35400', 'MEDIO':'#F39C12', 'BAJO':'#27AE60'},
+            category_orders={"Impacto": ["ALTO", "MEDIO", "BAJO"]}
+        )
+        fig_pie.update_layout(margin=dict(t=20, b=0, l=0, r=0), legend=dict(orientation="h", y=-0.1))
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    with c_right:
-        st.write("#### 🏛️ Proyectos por Partido")
-        partidos = df['Partido_Politico'].value_counts().reset_index()
-        fig_bar = px.bar(partidos, x='count', y='Partido_Politico', 
-                         orientation='h',
-                         labels={'count':'Cantidad', 'Partido_Politico':''},
-                         color_discrete_sequence=['#004481'])
-        fig_bar.update_layout(margin=dict(t=30, b=0, l=0, r=0))
+    with col2:
+        st.markdown("##### 🏛️ Actividad por Bloque Político")
+        # Top 10 partidos para que no se vea amontonado
+        partidos_count = df['Partido_Politico'].value_counts().head(10).reset_index()
+        fig_bar = px.bar(
+            partidos_count, x='count', y='Partido_Politico',
+            orientation='h',
+            labels={'count': 'Cantidad', 'index': ''},
+            color='count', color_continuous_scale='Blues'
+        )
+        fig_bar.update_layout(margin=dict(t=20, b=0, l=0, r=0), showlegend=False, coloraxis_showscale=False)
         st.plotly_chart(fig_bar, use_container_width=True)
 
-    st.divider()
+    # --- NUEVO GRÁFICO: MAPA DE CALOR POR PROVINCIA ---
+    st.markdown("##### 🗺️ Distribución Geográfica de Autores")
+    prov_count = df['Provincia'].value_counts().reset_index()
+    fig_prov = px.bar(prov_count, x='Provincia', y='count', color_discrete_sequence=['#004481'])
+    fig_prov.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig_prov, use_container_width=True)
 
-    # --- BLOQUE 3: TABLA DE DATOS (ORDENADA Y SIN ID) ---
-    st.write("### 🔍 Listado Detallado de Proyectos")
-    
-    # Creamos lista de columnas EXCLUYENDO el ID
-    cols_to_show = [c for c in df.columns if c != "ID"]
+    st.markdown("---")
+
+    # --- TABLA FINAL ---
+    st.markdown("### 📋 Detalle de Proyectos Legislativos")
+    cols_to_show = ["Fecha_de_inicio", "Camara_de_Origen", "Expediente", "Autor", "Proyecto", "Impacto", "Observaciones"]
     
     st.dataframe(
         df,
-        column_order=cols_to_show, # Aquí forzamos a que NO muestre el ID
+        column_order=cols_to_show,
         hide_index=True,
         use_container_width=True,
         column_config={
-            "Fecha_de_inicio": "Fecha",
+            "Fecha_de_inicio": "Inicio",
             "Camara_de_Origen": "Cámara",
-            "Proyecto": st.column_config.TextColumn("Título del Proyecto", width="large"),
+            "Proyecto": st.column_config.TextColumn("Título", width="large"),
             "Impacto": st.column_config.SelectboxColumn("Impacto", options=["ALTO", "MEDIO", "BAJO"]),
-            "Observaciones": st.column_config.TextColumn("Análisis Técnico", width="medium")
+            "Observaciones": st.column_config.TextColumn("Análisis", width="medium")
         }
     )
-
 else:
-    # Mensaje amigable si la API devuelve vacío
-    st.info("💡 **Aviso:** No se detectaron proyectos cargados. Si acabas de actualizar la planilla, presiona el botón 'Sincronizar ahora' en la barra lateral.")
-    st.image("https://cdn.dribbble.com/users/252114/screenshots/3840347/no_data_found.png", width=400)
+    st.warning("No hay datos que coincidan con los filtros seleccionados.")
