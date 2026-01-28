@@ -10,20 +10,25 @@ API_URL = "https://prueba-9969.onrender.com/actualizar-datos"
 
 def ejecutar_carga():
     try:
-        # Leemos los datos actuales del Sheets
+        # Leemos los datos
         df = pd.read_csv(URL_CSV)
         
-        # Limpieza básica: quitar filas vacías y asegurar tipos de datos
-        df = df.dropna(subset=['ID']) 
+        # --- EL ARREGLO ESTÁ ACÁ ---
+        # Reemplazamos los NaN (celdas vacías) por un string vacío
+        # Esto hace que los datos sean compatibles con JSON
+        df = df.fillna("") 
         
-        # Convertimos a la lista de diccionarios que espera FastAPI
+        # Filtramos filas que realmente tengan un ID para no mandar basura
+        df = df[df['ID'] != ""]
+        
+        # Convertimos a la lista de diccionarios
         proyectos = df.to_dict(orient="records")
         
-        # Enviamos el POST a la API
+        # Enviamos el POST
         response = requests.post(API_URL, json=proyectos)
         
         if response.status_code == 200:
-            print(f"✅ Se cargaron {len(proyectos)} proyectos exitosamente.")
+            print(f"✅ Éxito: {len(proyectos)} proyectos cargados.")
         else:
             print(f"❌ Error API: {response.status_code} - {response.text}")
             
