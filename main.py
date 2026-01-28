@@ -1,11 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-import pandas as pd
+import json
+import os
 
 app = FastAPI(title="API Monitor Legislativo BBVA")
 
-# 1. Definimos el modelo de datos exacto de tu tabla
+# Nombre del archivo de respaldo
+BACKUP_FILE = "datos_monitor.json"
+
 class Proyecto(BaseModel):
     ID: str
     Camara_de_Origen: str
@@ -19,42 +22,36 @@ class Proyecto(BaseModel):
     Provincia: str
     Observaciones: Optional[str] = None
 
-# 2. Base de datos en memoria (se resetea si la API se reinicia)
-# Para una pasantía esto sobra, si escala usaríamos una DB real.
-db_proyectos = []
+# Función para cargar datos al iniciar
+def cargar_de_disco():
+    if os.path.exists(BACKUP_FILE):
+        with open(BACKUP_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+# Inicializamos la base de datos con lo que haya en disco
+db_proyectos = cargar_de_disco()
 
 @app.get("/")
 def home():
-    return {
-        "status": "Online",
-        "organizacion": "Asuntos Públicos - BBVA",
-        "registros_actuales": len(db_proyectos)
-    }
+    return {"status": "Online", "registros": len(db_proyectos)}
 
-# 3. Endpoint para recibir los datos desde GitHub Actions
 @app.post("/actualizar-datos")
 def actualizar_datos(proyectos: List[Proyecto]):
     global db_proyectos
     try:
-        # Convertimos la lista de objetos Pydantic a una lista de diccionarios
+        # Convertimos a lista de dicts
         db_proyectos = [p.dict() for p in proyectos]
-        return {
-            "status": "success", 
-            "mensaje": f"Se actualizaron {len(db_proyectos)} registros correctamente."
-        }
+        
+        # GUARDAMOS EN DISCO (Esto es la persistencia)
+        with open(BACKUP_FILE, "w", encoding="utf-8") as f:
+            json.dump(db_proyectos, f, ensure_ascii=False, indent=4)
+            
+        return {"status": "success", "mensaje": f"Guardados {len(db_proyectos)} registros en disco."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 4. Endpoint para que Streamlit consuma los datos
 @app.get("/datos")
 def obtener_datos():
-    if not db_proyectos:
-        return {"mensaje": "No hay datos cargados aún", "datos": []}
+    # Siempre devolvemos lo que hay en memoria (que se cargó al iniciar)
     return db_proyectos
-
-if __name__ == "__main__":
-    import uvicorn
-    import os
-    # Render asigna un puerto dinámico en la variable de entorno PORT
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
