@@ -4,3 +4,4 @@ st-gsheets-connection
 fastapi
 uvicorn
 pydantic
+plotly
